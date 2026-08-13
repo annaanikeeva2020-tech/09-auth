@@ -35,7 +35,6 @@ export default function EditProfilePage() {
       setUser(updatedUser);
 
       router.push("/profile");
-      router.refresh();
     } catch {
       setError("Failed to update profile.");
     }

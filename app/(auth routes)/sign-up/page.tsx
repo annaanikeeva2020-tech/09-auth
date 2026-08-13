@@ -31,7 +31,6 @@ export default function SignUpPage() {
       setUser(user);
 
       router.push("/profile");
-      router.refresh();
     } catch {
       setError("Registration failed. Please check your data.");
     }
