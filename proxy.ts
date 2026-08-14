@@ -37,7 +37,6 @@ export async function proxy(request: NextRequest) {
     isAuthenticated = true;
   } else if (refreshToken) {
     sessionResponse = await checkSession();
-
     isAuthenticated = !!sessionResponse.data;
   }
 
@@ -53,11 +52,11 @@ export async function proxy(request: NextRequest) {
     );
   }
 
-  const response = NextResponse.next();
-
   const setCookie = sessionResponse?.headers["set-cookie"];
 
   if (setCookie) {
+    const response = NextResponse.redirect(request.url);
+
     const cookies = Array.isArray(setCookie)
       ? setCookie
       : [setCookie];
@@ -65,9 +64,11 @@ export async function proxy(request: NextRequest) {
     for (const cookie of cookies) {
       response.headers.append("set-cookie", cookie);
     }
+
+    return response;
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
