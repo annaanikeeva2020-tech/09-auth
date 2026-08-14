@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+
 import { checkSession } from "@/lib/api/serverApi";
 
 const privateRoutes = ["/profile", "/notes"];
 const publicRoutes = ["/sign-in", "/sign-up"];
 
+const isRouteMatch = (pathname: string, route: string) =>
+  pathname === route || pathname.startsWith(`${route}/`);
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPrivateRoute = privateRoutes.some((route) =>
-    pathname.startsWith(route)
+    isRouteMatch(pathname, route)
   );
 
   const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
+    isRouteMatch(pathname, route)
   );
 
   if (!isPrivateRoute && !isPublicRoute) {
@@ -22,6 +26,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const cookieStore = await cookies();
+
   const accessToken = cookieStore.get("accessToken")?.value;
   const refreshToken = cookieStore.get("refreshToken")?.value;
 
@@ -30,16 +35,18 @@ export async function proxy(request: NextRequest) {
 
   if (accessToken) {
     isAuthenticated = true;
-  }
-  else if (refreshToken) {
+  } else if (refreshToken) {
     sessionResponse = await checkSession();
+
     isAuthenticated = !!sessionResponse.data;
   }
+
   if (isPrivateRoute && !isAuthenticated) {
     return NextResponse.redirect(
       new URL("/sign-in", request.url)
     );
   }
+
   if (isPublicRoute && isAuthenticated) {
     return NextResponse.redirect(
       new URL("/", request.url)
@@ -47,6 +54,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
+
   const setCookie = sessionResponse?.headers["set-cookie"];
 
   if (setCookie) {
