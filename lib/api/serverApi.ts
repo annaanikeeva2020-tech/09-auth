@@ -1,6 +1,4 @@
 import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
-
 import api from "./api";
 
 import type { Note } from "@/types/note";
@@ -67,25 +65,12 @@ export async function getMe(): Promise<User> {
   return response.data;
 }
 
-export async function checkSession(request: NextRequest) {
-  const accessToken = request.cookies.get("accessToken")?.value;
-  const refreshToken = request.cookies.get("refreshToken")?.value;
+export async function checkSession() {
+  const cookieStore = await cookies();
 
-  if (accessToken) {
     return api.get<User | null>("/auth/session", {
       headers: {
-        Cookie: `accessToken=${accessToken}`,
+        Cookie:cookieStore.toString(),
       },
     });
   }
-
-  if (!refreshToken) {
-    return null;
-  }
-
-  return api.get<User | null>("/auth/session", {
-    headers: {
-      Cookie: `refreshToken=${refreshToken}`,
-    },
-  });
-}

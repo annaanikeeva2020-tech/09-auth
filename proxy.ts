@@ -21,16 +21,24 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const sessionResponse = await checkSession(request);
+  const accessToken = request.cookies.get("accessToken")?.value;
+  const refreshToken = request.cookies.get("refreshToken")?.value;
 
-  const isAuthenticated = !!sessionResponse?.data;
+  let isAuthenticated = false;
+  let sessionResponse = null;
 
+  if (accessToken) {
+    isAuthenticated = true;
+  }
+  else if (refreshToken) {
+    sessionResponse = await checkSession();
+    isAuthenticated = !!sessionResponse.data;
+  }
   if (isPrivateRoute && !isAuthenticated) {
     return NextResponse.redirect(
       new URL("/sign-in", request.url)
     );
   }
-
   if (isPublicRoute && isAuthenticated) {
     return NextResponse.redirect(
       new URL("/", request.url)
@@ -38,7 +46,6 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-
   const setCookie = sessionResponse?.headers["set-cookie"];
 
   if (setCookie) {
