@@ -31,41 +31,65 @@ export async function proxy(request: NextRequest) {
   const refreshToken = cookieStore.get("refreshToken")?.value;
 
   let isAuthenticated = false;
-  let sessionResponse = null;
+  let refreshedCookies: string[] = [];
 
+  // Есть accessToken — сессию дополнительно проверять не нужно
   if (accessToken) {
     isAuthenticated = true;
-  } else if (refreshToken) {
-    sessionResponse = await checkSession();
-    isAuthenticated = !!sessionResponse.data;
   }
 
+  // accessToken отсутствует, но есть refreshToken —
+  // пытаемся обновить сессию
+  else if (refreshToken) {
+    const sessionResponse = await checkSession();
+
+    const setCookie = sessionResponse.headers["set-cookie"];
+
+    if (setCookie) {
+      refreshedCookies = Array.isArray(setCookie)
+        ? setCookie
+        : [setCookie];
+
+      const hasAccessToken = refreshedCookies.some((cookie) =>
+        cookie.trim().startsWith("accessToken=")
+      );
+
+      const hasRefreshToken = refreshedCookies.some((cookie) =>
+        cookie.trim().startsWith("refreshToken=")
+      );
+
+      // Считаем сессию обновлённой только если
+      // сервер действительно прислал новый токен
+      if (hasAccessToken || hasRefreshToken) {
+        isAuthenticated = true;
+      }
+    }
+  }
+
+  // Если получили новые токены, сначала устанавливаем их
+  // в response, а затем redirect на тот же URL.
+  if (refreshedCookies.length > 0 && isAuthenticated) {
+    const response = NextResponse.redirect(request.url);
+
+    for (const cookie of refreshedCookies) {
+      response.headers.append("set-cookie", cookie);
+    }
+
+    return response;
+  }
+
+  // Private route без авторизации
   if (isPrivateRoute && !isAuthenticated) {
     return NextResponse.redirect(
       new URL("/sign-in", request.url)
     );
   }
 
+  // Public route для уже авторизованного пользователя
   if (isPublicRoute && isAuthenticated) {
     return NextResponse.redirect(
       new URL("/", request.url)
     );
-  }
-
-  const setCookie = sessionResponse?.headers["set-cookie"];
-
-  if (setCookie) {
-    const response = NextResponse.redirect(request.url);
-
-    const cookies = Array.isArray(setCookie)
-      ? setCookie
-      : [setCookie];
-
-    for (const cookie of cookies) {
-      response.headers.append("set-cookie", cookie);
-    }
-
-    return response;
   }
 
   return NextResponse.next();
